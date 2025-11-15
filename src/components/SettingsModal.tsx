@@ -223,6 +223,20 @@ export function SettingsModal({ isOpen, onClose, settings, onSaveSettings, showA
       name: 'Groq',
       url: 'https://console.groq.com/keys',
       description: 'For Llama, GPT OSS, and Kimi models'
+    },
+    // ✅ NEW: Cerebras
+    {
+      id: 'cerebrasApiKey' as keyof APISettings,
+      name: 'Cerebras',
+      url: 'https://cloud.cerebras.ai/platform',
+      description: 'Ultra-fast inference for large models'
+    },
+    // ✅ NEW: MegaLLM
+    {
+      id: 'megallmApiKey' as keyof APISettings,
+      name: 'MegaLLM',
+      url: 'https://megallm.io/dashboard/models',
+      description: 'For GPT-5, Claude 4.5, and next-gen models'
     }
   ];
 
