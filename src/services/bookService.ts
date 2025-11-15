@@ -61,6 +61,8 @@ class BookGenerationService {
     zhipuApiKey: '',
     mistralApiKey: '',
     groqApiKey: '',
+    cerebrasApiKey: '',
+    megallmApiKey: '',
     selectedProvider: 'google',
     selectedModel: 'gemini-2.5-flash'
   };
@@ -362,6 +364,8 @@ Now analyze the user's input and generate the optimized JSON response.`;
       case 'mistral': return this.settings.mistralApiKey || null;
       case 'zhipu': return this.settings.zhipuApiKey || null;
       case 'groq': return this.settings.groqApiKey || null;
+      case 'cerebras': return this.settings.cerebrasApiKey || null; // ✅ NEW
+      case 'megallm': return this.settings.megallmApiKey || null;   // ✅ NEW
       default: return null;
     }
   }
@@ -453,11 +457,29 @@ Now analyze the user's input and generate the optimized JSON response.`;
       });
     }
 
-   if (this.settings.groqApiKey && this.settings.selectedProvider !== 'groq') {
+    if (this.settings.groqApiKey && this.settings.selectedProvider !== 'groq') {
       alternatives.push({
         provider: 'groq',
         model: 'llama-3.3-70b-versatile',
         name: 'Groq Llama 3.3 70B'
+      });
+    }
+
+    // ✅ NEW: Cerebras alternatives
+    if (this.settings.cerebrasApiKey && this.settings.selectedProvider !== 'cerebras') {
+      alternatives.push({
+        provider: 'cerebras',
+        model: 'gpt-oss-120b',
+        name: 'Cerebras GPT-OSS 120B'
+      });
+    }
+
+    // ✅ NEW: MegaLLM alternatives
+    if (this.settings.megallmApiKey && this.settings.selectedProvider !== 'megallm') {
+      alternatives.push({
+        provider: 'megallm',
+        model: 'gpt-5.1',
+        name: 'MegaLLM GPT-5.1'
       });
     }
     
@@ -535,6 +557,12 @@ Now analyze the user's input and generate the optimized JSON response.`;
           break;
         case 'groq':
           result = await this.generateWithGroq(prompt, abortController.signal, onChunk, session); 
+          break;
+        case 'cerebras': // ✅ NEW
+          result = await this.generateWithCerebras(prompt, abortController.signal, onChunk);
+          break;
+        case 'megallm': // ✅ NEW
+          result = await this.generateWithMegaLLM(prompt, abortController.signal, onChunk);
           break;
         default: 
           throw new Error(`Unsupported provider: ${this.settings.selectedProvider}`);
@@ -865,6 +893,174 @@ Now analyze the user's input and generate the optimized JSON response.`;
       }
     }
     throw new Error('Groq API failed after retries');
+  }
+
+  // ✅ NEW: Cerebras API Integration
+  private async generateWithCerebras(prompt: string, signal?: AbortSignal, onChunk?: (chunk: string) => void): Promise<string> {
+    const apiKey = this.getApiKey();
+    const model = this.settings.selectedModel;
+    const maxRetries = this.MAX_MODULE_RETRIES;
+    let attempt = 0;
+
+    while (attempt < maxRetries) {
+      try {
+        const response = await fetch('https://api.cerebras.ai/v1/chat/completions', {
+          method: 'POST',
+          headers: { 
+            'Content-Type': 'application/json', 
+            'Authorization': `Bearer ${apiKey}` 
+          },
+          body: JSON.stringify({
+            model: model,
+            messages: [{ role: 'user', content: prompt }],
+            temperature: 0.7,
+            max_tokens: 8192,
+            stream: true
+          }),
+          signal
+        });
+
+        if (response.status === 429 || response.status === 503) {
+          const delay = this.calculateRetryDelay(attempt + 1, true);
+          console.warn(`[CEREBRAS] Rate limit hit. Waiting ${Math.round(delay/1000)}s before retry ${attempt + 1}/${maxRetries}`);
+          await sleep(delay);
+          attempt++;
+          continue;
+        }
+
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({}));
+          throw new Error(errorData?.error?.message || `Cerebras API Error: ${response.status}`);
+        }
+
+        if (!response.body) throw new Error('Response body is null');
+
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+        let fullContent = '';
+        let buffer = '';
+
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+
+          buffer += decoder.decode(value, { stream: true });
+          const lines = buffer.split('\n');
+          buffer = lines.pop() || '';
+
+          for (const line of lines) {
+            const trimmedLine = line.trim();
+            if (trimmedLine.startsWith('data: ')) {
+              const jsonStr = trimmedLine.substring(6);
+              if (jsonStr === '[DONE]') continue;
+
+              try {
+                const data = JSON.parse(jsonStr);
+                const textPart = data?.choices?.[0]?.delta?.content || '';
+                if (textPart) {
+                  fullContent += textPart;
+                  if (onChunk) onChunk(textPart);
+                }
+              } catch (parseError) {}
+            }
+          }
+        }
+
+        if (!fullContent) throw new Error('No content generated');
+        return fullContent;
+
+      } catch (error) {
+        if (error instanceof Error && error.name === 'AbortError') throw error;
+        attempt++;
+        if (attempt >= maxRetries) throw error;
+        await sleep(this.calculateRetryDelay(attempt, false));
+      }
+    }
+    throw new Error('Cerebras API failed after retries');
+  }
+
+  // ✅ NEW: MegaLLM API Integration
+  private async generateWithMegaLLM(prompt: string, signal?: AbortSignal, onChunk?: (chunk: string) => void): Promise<string> {
+    const apiKey = this.getApiKey();
+    const model = this.settings.selectedModel;
+    const maxRetries = this.MAX_MODULE_RETRIES;
+    let attempt = 0;
+
+    while (attempt < maxRetries) {
+      try {
+        const response = await fetch('https://megallm.io/v1/chat/completions', {
+          method: 'POST',
+          headers: { 
+            'Content-Type': 'application/json', 
+            'Authorization': `Bearer ${apiKey}` 
+          },
+          body: JSON.stringify({
+            model: model,
+            messages: [{ role: 'user', content: prompt }],
+            temperature: 0.7,
+            max_tokens: 8192,
+            stream: true
+          }),
+          signal
+        });
+
+        if (response.status === 429 || response.status === 503) {
+          const delay = this.calculateRetryDelay(attempt + 1, true);
+          console.warn(`[MEGALLM] Rate limit hit. Waiting ${Math.round(delay/1000)}s before retry ${attempt + 1}/${maxRetries}`);
+          await sleep(delay);
+          attempt++;
+          continue;
+        }
+
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({}));
+          throw new Error(errorData?.error?.message || `MegaLLM API Error: ${response.status}`);
+        }
+
+        if (!response.body) throw new Error('Response body is null');
+
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+        let fullContent = '';
+        let buffer = '';
+
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+
+          buffer += decoder.decode(value, { stream: true });
+          const lines = buffer.split('\n');
+          buffer = lines.pop() || '';
+
+          for (const line of lines) {
+            const trimmedLine = line.trim();
+            if (trimmedLine.startsWith('data: ')) {
+              const jsonStr = trimmedLine.substring(6);
+              if (jsonStr === '[DONE]') continue;
+
+              try {
+                const data = JSON.parse(jsonStr);
+                const textPart = data?.choices?.[0]?.delta?.content || '';
+                if (textPart) {
+                  fullContent += textPart;
+                  if (onChunk) onChunk(textPart);
+                }
+              } catch (parseError) {}
+            }
+          }
+        }
+
+        if (!fullContent) throw new Error('No content generated');
+        return fullContent;
+
+      } catch (error) {
+        if (error instanceof Error && error.name === 'AbortError') throw error;
+        attempt++;
+        if (attempt >= maxRetries) throw error;
+        await sleep(this.calculateRetryDelay(attempt, false));
+      }
+    }
+    throw new Error('MegaLLM API failed after retries');
   }
 
   async generateRoadmap(session: BookSession, bookId: string): Promise<BookRoadmap> {
@@ -1534,7 +1730,9 @@ Now analyze the user's input and generate the optimized JSON response.`;
       google: 'Google Gemini', 
       mistral: 'Mistral AI', 
       zhipu: 'ZhipuAI',
-      groq: 'Groq'
+      groq: 'Groq',
+      cerebras: 'Cerebras', // ✅ NEW
+      megallm: 'MegaLLM'     // ✅ NEW
     };
     return names[this.settings.selectedProvider] || 'AI';
   }
