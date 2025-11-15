@@ -10,7 +10,6 @@ const defaultSettings: APISettings = {
   mistralApiKey: '',
   groqApiKey: '',
   cerebrasApiKey: '',
-  megallmApiKey: '',
   selectedProvider: 'google',
   selectedModel: 'gemini-2.5-flash',
 };
@@ -29,7 +28,7 @@ export const storageUtils = {
       };
 
       // Validate provider
-      if (!settings.selectedProvider || !['google', 'mistral', 'zhipu', 'groq', 'cerebras', 'megallm'].includes(settings.selectedProvider)) {
+      if (!settings.selectedProvider || !['google', 'mistral', 'zhipu', 'groq', 'cerebras'].includes(settings.selectedProvider)) {
         console.warn('Invalid selectedProvider found in storage:', settings.selectedProvider);
         settings.selectedProvider = defaultSettings.selectedProvider;
       }
@@ -49,13 +48,6 @@ export const storageUtils = {
           'gpt-oss-120b',
           'qwen-3-235b-a22b-instruct-2507',
           'zai-glm-4.6'
-        ],
-        megallm: [
-          'gpt-5.1',
-          'claude-sonnet-4-5-20250929',
-          'claude-haiku-4-5-20251001',
-          'gpt-5',
-          'gpt-5-mini'
         ]
       };
 
@@ -75,7 +67,7 @@ export const storageUtils = {
 
   saveSettings(settings: APISettings): void {
     try {
-      if (!settings.selectedProvider || !['google', 'mistral', 'zhipu', 'groq', 'cerebras', 'megallm'].includes(settings.selectedProvider)) {
+      if (!settings.selectedProvider || !['google', 'mistral', 'zhipu', 'groq', 'cerebras'].includes(settings.selectedProvider)) {
         console.error('Attempted to save invalid selectedProvider:', settings.selectedProvider);
         settings.selectedProvider = defaultSettings.selectedProvider;
       }
