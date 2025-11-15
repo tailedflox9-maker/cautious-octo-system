@@ -188,8 +188,7 @@ function App() {
     settings.mistralApiKey || 
     settings.zhipuApiKey || 
     settings.groqApiKey || 
-    settings.cerebrasApiKey ||  // ✅ NEW
-    settings.megallmApiKey       // ✅ NEW
+    settings.cerebrasApiKey
   );
   
   const getAlternativeModels = () => {
@@ -210,10 +209,6 @@ function App() {
     // ✅ NEW: Cerebras
     if (settings.cerebrasApiKey && settings.selectedProvider !== 'cerebras') 
       alternatives.push({ provider: 'cerebras', model: 'gpt-oss-120b', name: 'Cerebras GPT-OSS 120B' });
-    
-    // ✅ NEW: MegaLLM
-    if (settings.megallmApiKey && settings.selectedProvider !== 'megallm') 
-      alternatives.push({ provider: 'megallm', model: 'gpt-5.1', name: 'MegaLLM GPT-5.1' });
     
     return alternatives;
   };
