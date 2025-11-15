@@ -558,10 +558,10 @@ Now analyze the user's input and generate the optimized JSON response.`;
         case 'groq':
           result = await this.generateWithGroq(prompt, abortController.signal, onChunk, session); 
           break;
-        case 'cerebras': // ✅ NEW
+        case 'cerebras':
           result = await this.generateWithCerebras(prompt, abortController.signal, onChunk);
           break;
-        case 'megallm': // ✅ NEW
+        case 'megallm': // ✅ UPDATED: Use MegaLLM specific function
           result = await this.generateWithMegaLLM(prompt, abortController.signal, onChunk);
           break;
         default: 
@@ -895,7 +895,63 @@ Now analyze the user's input and generate the optimized JSON response.`;
     throw new Error('Groq API failed after retries');
   }
 
-  // ✅ NEW: Cerebras API Integration
+  // ✅ NEW: CORS Proxy Method (Only for providers that need it)
+  private async generateWithProxy(prompt: string, signal?: AbortSignal, onChunk?: (chunk: string) => void): Promise<string> {
+    const provider = this.settings.selectedProvider;
+    const model = this.settings.selectedModel;
+    
+    const response = await fetch('/api/generate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ prompt, provider, model }),
+      signal
+    });
+  
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({ error: 'Unknown proxy error' }));
+      throw new Error(errorData.error || `Proxy Error: ${response.status}`);
+    }
+  
+    if (!response.body) throw new Error('Response body from proxy is null');
+  
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let fullContent = '';
+  
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      
+      const chunk = decoder.decode(value, { stream: true });
+      
+      // The proxy streams raw data, we need to parse it like other stream handlers
+      const lines = chunk.split('\n');
+
+      for (const line of lines) {
+        const trimmedLine = line.trim();
+        if (trimmedLine.startsWith('data: ')) {
+          const jsonStr = trimmedLine.substring(6);
+          if (jsonStr === '[DONE]') continue;
+
+          try {
+            const data = JSON.parse(jsonStr);
+            const textPart = data?.choices?.[0]?.delta?.content || '';
+            if (textPart) {
+              fullContent += textPart;
+              if (onChunk) onChunk(textPart);
+            }
+          } catch (parseError) {
+            // It might be a raw text chunk if the proxy fails, handle gracefully
+          }
+        }
+      }
+    }
+  
+    if (!fullContent) throw new Error('No content generated via proxy');
+    return fullContent;
+  }
+
+  // ✅ REVERTED: Cerebras uses a direct call as it works fine
   private async generateWithCerebras(prompt: string, signal?: AbortSignal, onChunk?: (chunk: string) => void): Promise<string> {
     const apiKey = this.getApiKey();
     const model = this.settings.selectedModel;
@@ -979,88 +1035,9 @@ Now analyze the user's input and generate the optimized JSON response.`;
     throw new Error('Cerebras API failed after retries');
   }
 
-  // ✅ NEW: MegaLLM API Integration
+  // ✅ UPDATED: MegaLLM now uses the proxy to fix CORS
   private async generateWithMegaLLM(prompt: string, signal?: AbortSignal, onChunk?: (chunk: string) => void): Promise<string> {
-    const apiKey = this.getApiKey();
-    const model = this.settings.selectedModel;
-    const maxRetries = this.MAX_MODULE_RETRIES;
-    let attempt = 0;
-
-    while (attempt < maxRetries) {
-      try {
-        const response = await fetch('https://megallm.io/v1/chat/completions', {
-          method: 'POST',
-          headers: { 
-            'Content-Type': 'application/json', 
-            'Authorization': `Bearer ${apiKey}` 
-          },
-          body: JSON.stringify({
-            model: model,
-            messages: [{ role: 'user', content: prompt }],
-            temperature: 0.7,
-            max_tokens: 8192,
-            stream: true
-          }),
-          signal
-        });
-
-        if (response.status === 429 || response.status === 503) {
-          const delay = this.calculateRetryDelay(attempt + 1, true);
-          console.warn(`[MEGALLM] Rate limit hit. Waiting ${Math.round(delay/1000)}s before retry ${attempt + 1}/${maxRetries}`);
-          await sleep(delay);
-          attempt++;
-          continue;
-        }
-
-        if (!response.ok) {
-          const errorData = await response.json().catch(() => ({}));
-          throw new Error(errorData?.error?.message || `MegaLLM API Error: ${response.status}`);
-        }
-
-        if (!response.body) throw new Error('Response body is null');
-
-        const reader = response.body.getReader();
-        const decoder = new TextDecoder();
-        let fullContent = '';
-        let buffer = '';
-
-        while (true) {
-          const { done, value } = await reader.read();
-          if (done) break;
-
-          buffer += decoder.decode(value, { stream: true });
-          const lines = buffer.split('\n');
-          buffer = lines.pop() || '';
-
-          for (const line of lines) {
-            const trimmedLine = line.trim();
-            if (trimmedLine.startsWith('data: ')) {
-              const jsonStr = trimmedLine.substring(6);
-              if (jsonStr === '[DONE]') continue;
-
-              try {
-                const data = JSON.parse(jsonStr);
-                const textPart = data?.choices?.[0]?.delta?.content || '';
-                if (textPart) {
-                  fullContent += textPart;
-                  if (onChunk) onChunk(textPart);
-                }
-              } catch (parseError) {}
-            }
-          }
-        }
-
-        if (!fullContent) throw new Error('No content generated');
-        return fullContent;
-
-      } catch (error) {
-        if (error instanceof Error && error.name === 'AbortError') throw error;
-        attempt++;
-        if (attempt >= maxRetries) throw error;
-        await sleep(this.calculateRetryDelay(attempt, false));
-      }
-    }
-    throw new Error('MegaLLM API failed after retries');
+    return this.generateWithProxy(prompt, signal, onChunk);
   }
 
   async generateRoadmap(session: BookSession, bookId: string): Promise<BookRoadmap> {
