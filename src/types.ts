@@ -1,5 +1,5 @@
 // src/types.ts
-export type ModelProvider = 'google' | 'mistral' | 'zhipu' | 'groq' | 'cerebras' | 'megallm';
+export type ModelProvider = 'google' | 'mistral' | 'zhipu' | 'groq' | 'cerebras';
 
 export type ModelID =
   // Google Gemini Models
@@ -21,13 +21,7 @@ export type ModelID =
   // Cerebras Models
   | 'gpt-oss-120b'
   | 'qwen-3-235b-a22b-instruct-2507'
-  | 'zai-glm-4.6'
-  // MegaLLM Models
-  | 'gpt-5.1'
-  | 'claude-sonnet-4-5-20250929'
-  | 'claude-haiku-4-5-20251001'
-  | 'gpt-5'
-  | 'gpt-5-mini';
+  | 'zai-glm-4.6';
 
 export interface APISettings {
   googleApiKey: string;
@@ -35,7 +29,6 @@ export interface APISettings {
   mistralApiKey: string;
   groqApiKey: string;
   cerebrasApiKey: string;
-  megallmApiKey: string;
   selectedModel: ModelID;
   selectedProvider: ModelProvider;
 }
