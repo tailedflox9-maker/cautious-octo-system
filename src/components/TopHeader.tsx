@@ -50,6 +50,30 @@ const GroqIcon = ({ theme }: { theme?: 'light' | 'dark' }) => (
   />
 );
 
+const CerebrasIcon = ({ theme }: { theme?: 'light' | 'dark' }) => (
+  <img 
+    src="/cerebras-color.svg" 
+    alt="Cerebras" 
+    className="w-5 h-5" 
+    style={{ 
+      filter: theme === 'light' ? 'brightness(0) saturate(100%)' : 'brightness(0) invert(1)',
+      opacity: 0.95 
+    }} 
+  />
+);
+
+const MegaLLMIcon = ({ theme }: { theme?: 'light' | 'dark' }) => (
+  <img 
+    src="/openai.svg" 
+    alt="MegaLLM" 
+    className="w-5 h-5" 
+    style={{ 
+      filter: theme === 'light' ? 'brightness(0) saturate(100%)' : 'brightness(0) invert(1)',
+      opacity: 0.95 
+    }} 
+  />
+);
+
 const modelConfig = {
   google: {
     name: "Google AI", 
@@ -76,15 +100,37 @@ const modelConfig = {
     models: [{ id: 'glm-4.5-flash', name: 'GLM 4.5 Flash', description: 'Chinese AI model' }] 
   },
   groq: {
-  name: "Groq", 
-  icon: (props: { theme?: 'light' | 'dark' }) => <GroqIcon {...props} />, 
-  models: [
-    { id: 'llama-3.3-70b-versatile', name: 'Llama 3.3 70B Versatile', description: 'Powerful & versatile' },
-    { id: 'openai/gpt-oss-120b', name: 'GPT OSS 120B', description: 'Large open-source model' },
-    { id: 'openai/gpt-oss-20b', name: 'GPT OSS 20B', description: 'Medium open-source model' },
-    { id: 'moonshotai/kimi-k2-instruct-0905', name: 'Kimi K2 Instruct (0905)', description: 'Moonshot AI instruction model' },
-  ]
-}
+    name: "Groq", 
+    icon: (props: { theme?: 'light' | 'dark' }) => <GroqIcon {...props} />, 
+    models: [
+      { id: 'llama-3.3-70b-versatile', name: 'Llama 3.3 70B Versatile', description: 'Powerful & versatile' },
+      { id: 'openai/gpt-oss-120b', name: 'GPT OSS 120B', description: 'Large open-source model' },
+      { id: 'openai/gpt-oss-20b', name: 'GPT OSS 20B', description: 'Medium open-source model' },
+      { id: 'moonshotai/kimi-k2-instruct-0905', name: 'Kimi K2 Instruct (0905)', description: 'Moonshot AI instruction model' },
+    ]
+  },
+  // ✅ NEW: Cerebras Models
+  cerebras: {
+    name: "Cerebras",
+    icon: (props: { theme?: 'light' | 'dark' }) => <CerebrasIcon {...props} />,
+    models: [
+      { id: 'gpt-oss-120b', name: 'GPT-OSS 120B', description: 'Ultra-fast inference with Cerebras' },
+      { id: 'qwen-3-235b-a22b-instruct-2507', name: 'Qwen 3 235B Instruct', description: 'Advanced multilingual model' },
+      { id: 'zai-glm-4.6', name: 'ZAI GLM 4.6', description: 'Optimized reasoning model' }
+    ]
+  },
+  // ✅ NEW: MegaLLM Models
+  megallm: {
+    name: "MegaLLM",
+    icon: (props: { theme?: 'light' | 'dark' }) => <MegaLLMIcon {...props} />,
+    models: [
+      { id: 'gpt-5.1', name: 'GPT-5.1', description: 'Next-gen flagship model' },
+      { id: 'claude-sonnet-4-5-20250929', name: 'Claude Sonnet 4.5', description: 'Powerful reasoning & coding' },
+      { id: 'claude-haiku-4-5-20251001', name: 'Claude Haiku 4.5', description: 'Fast & efficient responses' },
+      { id: 'gpt-5', name: 'GPT-5', description: 'Advanced general intelligence' },
+      { id: 'gpt-5-mini', name: 'GPT-5 Mini', description: 'Lightweight & cost-effective' }
+    ]
+  }
 };
 
 interface TopHeaderProps {
@@ -121,6 +167,8 @@ export function TopHeader({ settings, books, currentBookId, onModelChange, onOpe
       case 'mistral': return !!settings.mistralApiKey;
       case 'zhipu': return !!settings.zhipuApiKey;
       case 'groq': return !!settings.groqApiKey;
+      case 'cerebras': return !!settings.cerebrasApiKey; // ✅ NEW
+      case 'megallm': return !!settings.megallmApiKey;   // ✅ NEW
       default: return false;
     }
   };
