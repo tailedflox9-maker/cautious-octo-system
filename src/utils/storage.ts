@@ -8,7 +8,9 @@ const defaultSettings: APISettings = {
   googleApiKey: '',
   zhipuApiKey: '',
   mistralApiKey: '',
-  groqApiKey: '', // ✅ NEW
+  groqApiKey: '',
+  cerebrasApiKey: '',
+  megallmApiKey: '',
   selectedProvider: 'google',
   selectedModel: 'gemini-2.5-flash',
 };
@@ -26,13 +28,13 @@ export const storageUtils = {
         ...parsed,
       };
 
-      // ✅ UPDATED: Add groq to valid providers
-      if (!settings.selectedProvider || !['google', 'mistral', 'zhipu', 'groq'].includes(settings.selectedProvider)) {
+      // Validate provider
+      if (!settings.selectedProvider || !['google', 'mistral', 'zhipu', 'groq', 'cerebras', 'megallm'].includes(settings.selectedProvider)) {
         console.warn('Invalid selectedProvider found in storage:', settings.selectedProvider);
         settings.selectedProvider = defaultSettings.selectedProvider;
       }
 
-      // ✅ UPDATED: Add Groq models validation
+      // Validate models
       const validModels = {
         google: ['gemini-2.5-flash-lite', 'gemini-2.5-flash', 'gemma-3-27b-it', 'gemini-2.5-pro'],
         mistral: ['mistral-small-latest', 'mistral-medium-latest', 'mistral-large-latest'],
@@ -42,6 +44,18 @@ export const storageUtils = {
           'openai/gpt-oss-120b',
           'openai/gpt-oss-20b',
           'moonshotai/kimi-k2-instruct-0905'
+        ],
+        cerebras: [
+          'gpt-oss-120b',
+          'qwen-3-235b-a22b-instruct-2507',
+          'zai-glm-4.6'
+        ],
+        megallm: [
+          'gpt-5.1',
+          'claude-sonnet-4-5-20250929',
+          'claude-haiku-4-5-20251001',
+          'gpt-5',
+          'gpt-5-mini'
         ]
       };
 
@@ -61,7 +75,7 @@ export const storageUtils = {
 
   saveSettings(settings: APISettings): void {
     try {
-      if (!settings.selectedProvider || !['google', 'mistral', 'zhipu', 'groq'].includes(settings.selectedProvider)) {
+      if (!settings.selectedProvider || !['google', 'mistral', 'zhipu', 'groq', 'cerebras', 'megallm'].includes(settings.selectedProvider)) {
         console.error('Attempted to save invalid selectedProvider:', settings.selectedProvider);
         settings.selectedProvider = defaultSettings.selectedProvider;
       }
