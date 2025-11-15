@@ -1,5 +1,5 @@
 // ============================================================================
-// FILE: src/services/bookService.ts (COMPLETE, UPDATED VERSION)
+// FILE: src/services/bookService.ts (COMPLETE, FINAL VERSION)
 // ============================================================================
 
 import { BookProject, BookRoadmap, BookModule, RoadmapModule, BookSession } from '../types/book';
@@ -92,7 +92,6 @@ class BookGenerationService {
     this.onGenerationStatusUpdate = callback;
   }
   
-  // ✅ NEW: AI Enhancer method added to the service
   public async enhanceBookInput(userInput: string): Promise<EnhancedBookData> {
     const systemPrompt = `You are an intelligent assistant designed to help users create well-structured learning books using the Pustakam AI Book Generation Engine.
 
@@ -190,10 +189,8 @@ Now analyze the user's input and generate the optimized JSON response.`;
 
     const finalPrompt = `${systemPrompt}\n\n## User Input\n"${userInput}"`;
 
-    // Reuse the existing, robust generateWithAI method which already handles API keys and providers
     const response = await this.generateWithAI(finalPrompt);
 
-    // Clean and parse the response
     let cleanedResponse = response.trim()
       .replace(/```json\s*/g, '')
       .replace(/```\s*/g, '')
@@ -364,8 +361,8 @@ Now analyze the user's input and generate the optimized JSON response.`;
       case 'mistral': return this.settings.mistralApiKey || null;
       case 'zhipu': return this.settings.zhipuApiKey || null;
       case 'groq': return this.settings.groqApiKey || null;
-      case 'cerebras': return this.settings.cerebrasApiKey || null; // ✅ NEW
-      case 'megallm': return this.settings.megallmApiKey || null;   // ✅ NEW
+      case 'cerebras': return this.settings.cerebrasApiKey || null;
+      case 'megallm': return this.settings.megallmApiKey || null;
       default: return null;
     }
   }
@@ -465,7 +462,6 @@ Now analyze the user's input and generate the optimized JSON response.`;
       });
     }
 
-    // ✅ NEW: Cerebras alternatives
     if (this.settings.cerebrasApiKey && this.settings.selectedProvider !== 'cerebras') {
       alternatives.push({
         provider: 'cerebras',
@@ -474,7 +470,6 @@ Now analyze the user's input and generate the optimized JSON response.`;
       });
     }
 
-    // ✅ NEW: MegaLLM alternatives
     if (this.settings.megallmApiKey && this.settings.selectedProvider !== 'megallm') {
       alternatives.push({
         provider: 'megallm',
@@ -561,7 +556,7 @@ Now analyze the user's input and generate the optimized JSON response.`;
         case 'cerebras':
           result = await this.generateWithCerebras(prompt, abortController.signal, onChunk);
           break;
-        case 'megallm': // ✅ UPDATED: Use MegaLLM specific function
+        case 'megallm':
           result = await this.generateWithMegaLLM(prompt, abortController.signal, onChunk);
           break;
         default: 
@@ -895,63 +890,6 @@ Now analyze the user's input and generate the optimized JSON response.`;
     throw new Error('Groq API failed after retries');
   }
 
-  // ✅ NEW: CORS Proxy Method (Only for providers that need it)
-  private async generateWithProxy(prompt: string, signal?: AbortSignal, onChunk?: (chunk: string) => void): Promise<string> {
-    const provider = this.settings.selectedProvider;
-    const model = this.settings.selectedModel;
-    
-    const response = await fetch('/api/generate', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ prompt, provider, model }),
-      signal
-    });
-  
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({ error: 'Unknown proxy error' }));
-      throw new Error(errorData.error || `Proxy Error: ${response.status}`);
-    }
-  
-    if (!response.body) throw new Error('Response body from proxy is null');
-  
-    const reader = response.body.getReader();
-    const decoder = new TextDecoder();
-    let fullContent = '';
-  
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      
-      const chunk = decoder.decode(value, { stream: true });
-      
-      // The proxy streams raw data, we need to parse it like other stream handlers
-      const lines = chunk.split('\n');
-
-      for (const line of lines) {
-        const trimmedLine = line.trim();
-        if (trimmedLine.startsWith('data: ')) {
-          const jsonStr = trimmedLine.substring(6);
-          if (jsonStr === '[DONE]') continue;
-
-          try {
-            const data = JSON.parse(jsonStr);
-            const textPart = data?.choices?.[0]?.delta?.content || '';
-            if (textPart) {
-              fullContent += textPart;
-              if (onChunk) onChunk(textPart);
-            }
-          } catch (parseError) {
-            // It might be a raw text chunk if the proxy fails, handle gracefully
-          }
-        }
-      }
-    }
-  
-    if (!fullContent) throw new Error('No content generated via proxy');
-    return fullContent;
-  }
-
-  // ✅ REVERTED: Cerebras uses a direct call as it works fine
   private async generateWithCerebras(prompt: string, signal?: AbortSignal, onChunk?: (chunk: string) => void): Promise<string> {
     const apiKey = this.getApiKey();
     const model = this.settings.selectedModel;
@@ -1035,6 +973,59 @@ Now analyze the user's input and generate the optimized JSON response.`;
     throw new Error('Cerebras API failed after retries');
   }
 
+  // ✅ UPDATED: The proxy method for MegaLLM
+  private async generateWithProxy(prompt: string, signal?: AbortSignal, onChunk?: (chunk: string) => void): Promise<string> {
+    const model = this.settings.selectedModel;
+    
+    const response = await fetch('/api/generate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ prompt, model }),
+      signal
+    });
+  
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({ error: 'Unknown proxy error' }));
+      throw new Error(errorData.error || `Proxy Error: ${response.status}`);
+    }
+  
+    if (!response.body) throw new Error('Response body from proxy is null');
+  
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let fullContent = '';
+  
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      
+      const chunk = decoder.decode(value, { stream: true });
+      const lines = chunk.split('\n');
+
+      for (const line of lines) {
+        const trimmedLine = line.trim();
+        if (trimmedLine.startsWith('data: ')) {
+          const jsonStr = trimmedLine.substring(6);
+          if (jsonStr === '[DONE]') continue;
+
+          try {
+            const data = JSON.parse(jsonStr);
+            const textPart = data?.choices?.[0]?.delta?.content || '';
+            if (textPart) {
+              fullContent += textPart;
+              if (onChunk) onChunk(textPart);
+            }
+          } catch (parseError) {
+             // Ignore parsing errors for potentially incomplete stream chunks
+          }
+        }
+      }
+    }
+  
+    if (!fullContent) throw new Error('No content generated via proxy');
+    return fullContent;
+  }
+  
   // ✅ UPDATED: MegaLLM now uses the proxy to fix CORS
   private async generateWithMegaLLM(prompt: string, signal?: AbortSignal, onChunk?: (chunk: string) => void): Promise<string> {
     return this.generateWithProxy(prompt, signal, onChunk);
@@ -1708,8 +1699,8 @@ Now analyze the user's input and generate the optimized JSON response.`;
       mistral: 'Mistral AI', 
       zhipu: 'ZhipuAI',
       groq: 'Groq',
-      cerebras: 'Cerebras', // ✅ NEW
-      megallm: 'MegaLLM'     // ✅ NEW
+      cerebras: 'Cerebras',
+      megallm: 'MegaLLM'
     };
     return names[this.settings.selectedProvider] || 'AI';
   }
