@@ -183,18 +183,38 @@ function App() {
     setTheme(prevTheme => prevTheme === 'dark' ? 'light' : 'dark');
   };
 
-  const hasApiKey = !!(settings.googleApiKey || settings.mistralApiKey || settings.zhipuApiKey || settings.groqApiKey);
+  const hasApiKey = !!(
+    settings.googleApiKey || 
+    settings.mistralApiKey || 
+    settings.zhipuApiKey || 
+    settings.groqApiKey || 
+    settings.cerebrasApiKey ||  // ✅ NEW
+    settings.megallmApiKey       // ✅ NEW
+  );
   
   const getAlternativeModels = () => {
     const alternatives: Array<{provider: ModelProvider; model: string; name: string}> = [];
+    
     if (settings.googleApiKey && settings.selectedProvider !== 'google') 
       alternatives.push({ provider: 'google', model: 'gemini-2.5-flash', name: 'Google Gemini 2.5 Flash' });
+    
     if (settings.mistralApiKey && settings.selectedProvider !== 'mistral') 
       alternatives.push({ provider: 'mistral', model: 'mistral-small-latest', name: 'Mistral Small' });
+    
     if (settings.zhipuApiKey && settings.selectedProvider !== 'zhipu') 
       alternatives.push({ provider: 'zhipu', model: 'glm-4.5-flash', name: 'GLM 4.5 Flash' });
+    
     if (settings.groqApiKey && settings.selectedProvider !== 'groq') 
-      alternatives.push({ provider: 'groq', model: 'groq/compound-mini', name: 'Groq Compound Mini' });
+      alternatives.push({ provider: 'groq', model: 'llama-3.3-70b-versatile', name: 'Groq Llama 3.3 70B' });
+    
+    // ✅ NEW: Cerebras
+    if (settings.cerebrasApiKey && settings.selectedProvider !== 'cerebras') 
+      alternatives.push({ provider: 'cerebras', model: 'gpt-oss-120b', name: 'Cerebras GPT-OSS 120B' });
+    
+    // ✅ NEW: MegaLLM
+    if (settings.megallmApiKey && settings.selectedProvider !== 'megallm') 
+      alternatives.push({ provider: 'megallm', model: 'gpt-5.1', name: 'MegaLLM GPT-5.1' });
+    
     return alternatives;
   };
 
